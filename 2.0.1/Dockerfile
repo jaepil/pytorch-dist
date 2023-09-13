@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
 
-FROM ubuntu:22.10 AS base
+FROM ubuntu:23.04 AS base
 
 LABEL org.opencontainers.image.source https://github.com/jaepil/pytorch-dist
 
@@ -29,7 +29,7 @@ RUN apt-get update \
         libz-dev liblz4-dev libbz2-dev liblzma-dev libsnappy-dev libzstd-dev libbrotli-dev \
         libffi-dev libssl-dev openssl libc-ares-dev \
         \
-        curl wget git git-lfs python3 python3-dev python3-pip \
+        curl wget git git-lfs python3 python3-venv python3-dev python3-pip \
         \
     && if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
         apt-get install -y --no-install-recommends libdnnl-dev libmkl-dev; \
@@ -45,15 +45,16 @@ RUN wget --quiet https://github.com/Kitware/CMake/releases/download/v3.24.2/cmak
     && ./cmake-3.24.2-Linux-`uname -m`.sh --prefix=/usr --skip-license \
     && rm cmake-3.24.2-Linux-`uname -m`.sh
 
-RUN pip --no-cache-dir install pip setuptools wheel \
-    && pip --no-cache-dir install astunparse numpy pyyaml typing_extensions future six requests dataclasses \
+RUN python3 -m venv $HOME/.venv && . $HOME/.venv/bin/activate \
+    && pip --no-cache-dir install pip setuptools wheel \
+    && pip --no-cache-dir install astunparse numpy pyyaml typing_extensions future six requests dataclasses pyyaml \
     && if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
         pip --no-cache-dir install mkl mkl-include; \
     fi
 
 WORKDIR /app/tmp
-RUN git clone --depth 1 -b v2.0.1 https://github.com/pytorch/pytorch.git \
-    && cd pytorch && git submodule sync && git submodule update --init --recursive --jobs 0 \
+RUN . $HOME/.venv/bin/activate && git clone --depth 1 -b v2.0.1 https://github.com/pytorch/pytorch.git \
+    && cd pytorch && git submodule sync && git submodule update --init --recursive --jobs `nproc --all` \
     && CFLAGS="-Wno-stringop-overread -Wno-incompatible-pointer-types -Wno-sign-compare -Wno-nonnull" CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=1 -Wno-unused-result -Wno-uninitialized -Wno-maybe-uninitialized -Wno-nonnull -Wno-strict-aliasing -Wno-deprecated-declarations -Wno-free-nonheap-object" USE_DISTRIBUTED=OFF PYTORCH_BUILD_VERSION=2.0.1 PYTORCH_BUILD_NUMBER=1 python3 setup.py bdist_wheel && cd ..
 
 ADD docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
