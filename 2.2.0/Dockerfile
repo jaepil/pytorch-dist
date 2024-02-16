@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:experimental
 
+ARG PYTHON_VERSION=3.12
+
 # FROM ubuntu:23.04 AS base
-FROM python:3.11 AS base
+FROM python:$PYTHON_VERSION AS base
 
 LABEL org.opencontainers.image.source https://github.com/jaepil/pytorch-dist
 
